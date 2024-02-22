@@ -209,7 +209,9 @@ async function createDailyBogglePost(
     gameNumber = parseInt(gameCountString, 10) + 1;
   }
 
-  const boggleGame = generateBoggleGame(5);
+  const gridSize = Math.random() > 0.5 ? 5 : 4;
+
+  const boggleGame = generateBoggleGame(gridSize);
 
   const post = await context.reddit.submitPost({
     preview: (
