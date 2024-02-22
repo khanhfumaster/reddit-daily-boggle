@@ -1,6 +1,6 @@
 import { Devvit } from '@devvit/public-api';
 import { BoggleBoard } from './components/BoggleBoard.js';
-import { generateBoggleGame, wordToPoints } from './game/boggle.js';
+import { generateBoggleGame } from './game/boggle.js';
 import { Scoreboard, getScoreboard } from './api/scoreboard.js';
 import { LetterDice } from './components/LetterDice.js';
 
@@ -93,8 +93,7 @@ Devvit.addCustomPostType({
         return [];
       }
 
-      // return JSON.parse(wordListString);
-      return [];
+      return JSON.parse(wordListString);
     });
 
     const [scoreboard, setScoreboard] = context.useState<Scoreboard>(
@@ -221,21 +220,60 @@ async function createDailyBogglePost(
           alignment="center middle"
           padding="medium"
         >
-          <vstack width={'100%'} height="100%">
-            <vstack
-              cornerRadius="medium"
-              padding="medium"
-              backgroundColor="#2e3a8e"
-              gap="small"
-            >
-              {loadingBoard.map((row, y) => (
-                <hstack gap="small">
-                  {row.map((letter, x) => (
-                    <LetterDice letter={letter}></LetterDice>
-                  ))}
-                </hstack>
-              ))}
+          <vstack
+            backgroundColor="#ffffff"
+            width={'100%'}
+            height={'100%'}
+            padding="small"
+            gap="small"
+          >
+            <hstack width="100%" gap="small">
+              <vstack
+                width="80%"
+                alignment="middle center"
+                gap="medium"
+                cornerRadius="medium"
+                border="thick"
+                borderColor="#2e3a8e"
+              >
+                <text
+                  style="heading"
+                  color="#403e91"
+                  alignment="middle center"
+                ></text>
+              </vstack>
+
+              <hstack width="20%" grow alignment="center middle">
+                <button></button>
+              </hstack>
+            </hstack>
+
+            <vstack width={'100%'} height="100%">
+              <vstack
+                cornerRadius="medium"
+                padding="medium"
+                backgroundColor="#2e3a8e"
+                gap="small"
+              >
+                {loadingBoard.map((row, y) => (
+                  <hstack gap="small">
+                    {row.map((letter, x) => (
+                      <LetterDice letter={letter}></LetterDice>
+                    ))}
+                  </hstack>
+                ))}
+              </vstack>
             </vstack>
+
+            <vstack
+              grow
+              width="100%"
+              gap="medium"
+              cornerRadius="medium"
+              padding="small"
+              border="thick"
+              borderColor="#2e3a8e"
+            ></vstack>
           </vstack>
         </vstack>
       </blocks>
