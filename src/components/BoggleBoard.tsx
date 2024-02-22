@@ -12,10 +12,17 @@ export interface BoggleBoardProps {
   initialWordList: string[];
   scoreboard: ScoreboardType;
   updateScoreboard: (score: number) => Promise<void>;
+  reloadScoreboard: () => Promise<void>;
 }
 
 export const BoggleBoard: Devvit.BlockComponent<BoggleBoardProps> = (
-  { boggleGame, initialWordList, scoreboard, updateScoreboard },
+  {
+    boggleGame,
+    initialWordList,
+    scoreboard,
+    updateScoreboard,
+    reloadScoreboard,
+  },
   context
 ) => {
   const [selectedLetters, setSelectedLetters] = context.useState<
@@ -28,6 +35,8 @@ export const BoggleBoard: Devvit.BlockComponent<BoggleBoardProps> = (
 
   const [isInvalidWord, setIsInvalidWord] = context.useState<boolean>(false);
 
+  const [isValidWord, setIsValidWord] = context.useState<boolean>(false);
+
   const onInvalidWord = () => {
     setSelectedLetters([]);
     setIsInvalidWord(true);
@@ -39,25 +48,31 @@ export const BoggleBoard: Devvit.BlockComponent<BoggleBoardProps> = (
   };
 
   const onLetterDicePress = async (x: number, y: number) => {
-    if (selectedLetters.length > 0) {
-      const [lastX, lastY] = selectedLetters[selectedLetters.length - 1]
-        .split(':')
-        .map((n) => parseInt(n, 10));
-
-      if (Math.abs(x - lastX) > 1 || Math.abs(y - lastY) > 1) {
-        return;
-      }
-    }
-
-    if (selectedLetters.includes(`${x}:${y}`)) {
-      onClear();
-      return;
-    }
-
-    const newSelectedLetters: `${number}:${number}`[] = [
+    let newSelectedLetters: `${number}:${number}`[] = [
       ...selectedLetters,
       `${x}:${y}`,
     ];
+
+    if (isValidWord) {
+      setIsValidWord(false);
+      newSelectedLetters = [`${x}:${y}`];
+    } else {
+      if (selectedLetters.includes(`${x}:${y}`)) {
+        onClear();
+        return;
+      }
+
+      if (selectedLetters.length > 0) {
+        const [lastX, lastY] = selectedLetters[selectedLetters.length - 1]
+          .split(':')
+          .map((n) => parseInt(n, 10));
+
+        if (Math.abs(x - lastX) > 1 || Math.abs(y - lastY) > 1) {
+          onClear();
+          return;
+        }
+      }
+    }
 
     const currentWord = newSelectedLetters
       .map((l) => {
@@ -84,17 +99,20 @@ export const BoggleBoard: Devvit.BlockComponent<BoggleBoardProps> = (
       );
 
       await Promise.all([
-        context.redis.set(
-          `boggle:${context.postId}:userWords:${context.userId}`,
-          JSON.stringify(newWordList)
-        ),
+        context.scheduler.runJob({
+          name: 'update-word-list',
+          data: {
+            postId: context.postId,
+            userId: context.userId,
+            wordList: newWordList,
+          },
+          runAt: new Date(Date.now()),
+        }),
         updateScoreboard(newScore),
       ]);
 
       setWordList(newWordList);
-      setSelectedLetters([]);
-
-      return;
+      setIsValidWord(true);
     }
 
     setSelectedLetters(newSelectedLetters);
@@ -138,13 +156,27 @@ export const BoggleBoard: Devvit.BlockComponent<BoggleBoardProps> = (
           border="thick"
           borderColor={Colors.boggleBoard}
         >
-          <text color="#403e91" alignment="middle center">
+          <text
+            style={isValidWord ? 'heading' : undefined}
+            color={isValidWord ? '#65b200' : '#403e91'}
+            alignment="middle center"
+          >
             {currentWord}
           </text>
         </vstack>
 
         <hstack width="20%" grow alignment="center middle">
-          <button onPress={() => setShowScoreboard(!showScoreboard)}>
+          <button
+            onPress={async () => {
+              if (showScoreboard) {
+                return setShowScoreboard(false);
+              }
+
+              await reloadScoreboard();
+
+              setShowScoreboard(true);
+            }}
+          >
             {totalPoints}
           </button>
         </hstack>
@@ -161,6 +193,7 @@ export const BoggleBoard: Devvit.BlockComponent<BoggleBoardProps> = (
             <hstack gap="small">
               {row.map((letter, x) => (
                 <LetterDice
+                  correct={isValidWord && selectedLetters.includes(`${x}:${y}`)}
                   onPress={() => onLetterDicePress(x, y)}
                   letter={letter}
                   selected={selectedLetters.some((l) => l === `${x}:${y}`)}
@@ -171,21 +204,19 @@ export const BoggleBoard: Devvit.BlockComponent<BoggleBoardProps> = (
         </vstack>
       </vstack>
 
-      {wordList.length > 0 && (
-        <vstack
-          grow
-          width="100%"
-          gap="medium"
-          cornerRadius="medium"
-          padding="small"
-          border="thick"
-          borderColor={Colors.boggleBoard}
-        >
-          <text style="metadata" wrap color="#000000">
-            {wordList.join(', ').toLocaleUpperCase()}
-          </text>
-        </vstack>
-      )}
+      <vstack
+        grow
+        width="100%"
+        gap="medium"
+        cornerRadius="medium"
+        padding="small"
+        border="thick"
+        borderColor={Colors.boggleBoard}
+      >
+        <text style="metadata" wrap color="#000000">
+          {wordList.join(', ').toLocaleUpperCase()}
+        </text>
+      </vstack>
     </vstack>
   );
 };

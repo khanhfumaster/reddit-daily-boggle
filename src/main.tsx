@@ -1,7 +1,7 @@
 import { Devvit } from '@devvit/public-api';
 import { BoggleBoard } from './components/BoggleBoard.js';
-import { generateBoggleGame } from './game/boggle.js';
-import { Scoreboard, getScoreboard, updateScore } from './api/scoreboard.js';
+import { generateBoggleGame, wordToPoints } from './game/boggle.js';
+import { Scoreboard, getScoreboard } from './api/scoreboard.js';
 import { LetterDice } from './components/LetterDice.js';
 
 Devvit.configure({
@@ -93,7 +93,8 @@ Devvit.addCustomPostType({
         return [];
       }
 
-      return JSON.parse(wordListString);
+      // return JSON.parse(wordListString);
+      return [];
     });
 
     const [scoreboard, setScoreboard] = context.useState<Scoreboard>(
@@ -108,14 +109,26 @@ Devvit.addCustomPostType({
       }
     );
 
+    const reloadScoreboard = async () => {
+      const _scoreboard = await getScoreboard(context, context.postId!);
+
+      if (!_scoreboard) {
+        return;
+      }
+
+      setScoreboard(_scoreboard);
+    };
+
     const updateScoreboard = async (newScore: number) => {
-      const newScoreboard = await updateScore(
-        context,
-        context.postId!,
-        context.userId!,
-        newScore
-      );
-      setScoreboard(newScoreboard);
+      await context.scheduler.runJob({
+        name: 'update-scoreboard',
+        data: {
+          postId: context.postId,
+          userId: context.userId,
+          score: newScore,
+        },
+        runAt: new Date(Date.now()),
+      });
     };
 
     return (
@@ -124,6 +137,7 @@ Devvit.addCustomPostType({
         initialWordList={wordList}
         scoreboard={scoreboard}
         updateScoreboard={updateScoreboard}
+        reloadScoreboard={reloadScoreboard}
       />
     );
   },
@@ -136,6 +150,41 @@ const loadingBoard = [
   ['L', 'O', 'A', 'D', 'I'],
   ['N', 'G', '.', '.', '.'],
 ];
+
+Devvit.addSchedulerJob({
+  name: 'update-word-list',
+  onRun: async (event, context) => {
+    const { postId, userId, wordList } = event.data || {};
+    await context.redis.set(
+      `boggle:${postId}:userWords:${userId}`,
+      JSON.stringify(wordList)
+    );
+  },
+});
+
+Devvit.addSchedulerJob({
+  name: 'update-scoreboard',
+  onRun: async (event, context) => {
+    const { postId, userId, score } = event.data || {};
+
+    const scoreboard = await getScoreboard(context, postId);
+
+    if (!scoreboard[userId]) {
+      const user = await context.reddit.getUserById(userId);
+      scoreboard[userId] = {
+        score,
+        username: user.username,
+      };
+    } else {
+      scoreboard[userId].score = score;
+    }
+
+    await context.redis.set(
+      `boggle:${postId}:scoreboard`,
+      JSON.stringify(scoreboard)
+    );
+  },
+});
 
 Devvit.addSchedulerJob({
   name: 'daily-boggle-create',

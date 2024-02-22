@@ -4,13 +4,19 @@ interface LetterDiceProps {
   letter: string;
   onPress?: () => void;
   selected?: boolean;
+  correct?: boolean;
 }
 
-export function LetterDice({ letter, selected, onPress }: LetterDiceProps) {
+export function LetterDice({
+  letter,
+  selected,
+  onPress,
+  correct,
+}: LetterDiceProps) {
   return (
     <vstack
       border="thick"
-      borderColor={selected ? '#7c121e' : '#e5e8ef'}
+      borderColor={correct ? '#65b200' : selected ? '#FF4500' : '#e5e8ef'}
       onPress={() => {
         if (onPress) return onPress();
       }}
